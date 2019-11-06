@@ -1,4 +1,4 @@
-import pandas
+import pandas as pd
 import re
 import numpy as np
 
@@ -23,14 +23,14 @@ transfer_2 = "d1"
 total_wt = 'wt'
 
 # extract from excel files
-ACWR = pandas.ExcelFile("./CARRIER_DATA2/ACWR.xlsx").parse("Sheet1")
-AGR_BPRR = pandas.ExcelFile("./CARRIER_DATA2/AGR_BPRR.xlsx").parse("Sheet1")
-FMRC = pandas.ExcelFile("./CARRIER_DATA2/FMRC.xlsx").parse("Sheet1")
-GNBC = pandas.ExcelFile("./CARRIER_DATA2/GNBC.xlsx").parse("Sheet1")
-INRR = pandas.ExcelFile("./CARRIER_DATA2/INRR.xlsx").parse("Sheet1")
-KYLE = pandas.ExcelFile("./CARRIER_DATA2/KYLE.xlsx").parse("Sheet1")
-WSOR = pandas.ExcelFile("./CARRIER_DATA2/WSOR.xlsx").parse("Sheet1")
-YSVR = pandas.ExcelFile("./CARRIER_DATA2/YSVR.xlsx").parse("Sheet1")
+ACWR = pd.ExcelFile("./CARRIER_DATA2/ACWR.xlsx").parse("Sheet1")
+AGR_BPRR = pd.ExcelFile("./CARRIER_DATA2/AGR_BPRR.xlsx").parse("Sheet1")
+FMRC = pd.ExcelFile("./CARRIER_DATA2/FMRC.xlsx").parse("Sheet1")
+GNBC = pd.ExcelFile("./CARRIER_DATA2/GNBC.xlsx").parse("Sheet1")
+INRR = pd.ExcelFile("./CARRIER_DATA2/INRR.xlsx").parse("Sheet1")
+KYLE = pd.ExcelFile("./CARRIER_DATA2/KYLE.xlsx").parse("Sheet1")
+WSOR = pd.ExcelFile("./CARRIER_DATA2/WSOR.xlsx").parse("Sheet1")
+YSVR = pd.ExcelFile("./CARRIER_DATA2/YSVR.xlsx").parse("Sheet1")
 
 # preparing acwr data ??? Interline Off-Line O/D
 acwr = ACWR[['Sum of Num Of Cars', 'Median Weight', 'In Out', 'Commodity', 'Median Mileage from Station to Interchange',
@@ -229,13 +229,13 @@ inrr = inrr.rename(
 # preparing KYLE
 kyle = KYLE
 kyle = kyle[
-    ['Interchange Road From', 'Interchange Road To', 'STCC Description', 'Net Weight', 'Station Name Trip Start',
+    ['Interchange Road From', 'Interchange Road To', 'STCC', 'Net Weight', 'Station Name Trip Start',
      'State Trip Start', 'Station Name Trip End', 'State Trip End', 'TMS Miles', 'Number of Cars', 'WB Origin',
      'WB Destination']]
 kyle['o1'] = kyle['Station Name Trip Start'] + ', ' + kyle['State Trip Start']
 kyle['d1'] = kyle['Station Name Trip End'] + ', ' + kyle['State Trip End']
 kyle = kyle.drop(['Station Name Trip Start', 'State Trip Start', 'Station Name Trip End', 'State Trip End'], axis=1)
-kyle = kyle.rename(columns={'Number of Cars': no_of_cars, 'Net Weight': wt_per_car, 'STCC Description': commodity,
+kyle = kyle.rename(columns={'Number of Cars': no_of_cars, 'Net Weight': wt_per_car, 'STCC': commodity,
                             'TMS Miles': online_dist, 'Interchange Road From': start_rr, 'rr': current_rr,
                             'Interchange Road To': forwarded_rr, 'WB Origin': origin, 'WB Destination': destination})
 kyle = kyle.replace('Missing', np.nan)
@@ -249,10 +249,13 @@ kyle['rr'] = 'kyle'
 # need to work on "Road & Junctions", the final or first taken
 wsor = WSOR
 # the bridge data has 0 tons so removed
+
+
 wsor = wsor[wsor['IB/OB'] != 'BRIDGE']
 # wsor = wsor.dropna() #removing "Total" calculated in the excel file, lets not be that aggressive
 wsor = wsor.drop(['Seasonality'], axis=1)
-for i in range(len(inrr)):
+wsor['Commodity'] = wsor['Commodity'].str.split('-',1).str[0]
+for i in range(len(wsor)):
     if wsor['IB/OB'].iloc[i] == 'In':
         wsor.at[i, 'rr1'] = wsor['Road & Junctions'].iloc[i].split(' ')[0]
         wsor.at[i, 'o1'] = np.nan
@@ -264,10 +267,16 @@ for i in range(len(inrr)):
         wsor.at[i, 'd1'] = np.nan
 
 wsor = wsor.drop(['D-Rd', 'IB/OB', 'O-Rd', 'Road & Junctions'], axis=1)
-wsor = wsor.rename(columns={'Sum of Total Cars': no_of_cars, 'Average of Tons': wt_per_car, 'Description': commodity,
+wsor = wsor.rename(columns={'Sum of Total Cars': no_of_cars, 'Average of Tons': wt_per_car, 'Commodity': commodity,
                             'Average of Miles2': all_dist, 'rr1': start_rr, 'rr': current_rr,
                             'Destination	D-Rd': forwarded_rr, 'o1': transfer_1, 'd1': transfer_2, 'Origin': origin,
                             'Destination': destination})
+
+# data with total removed
+wsor[commodity] = wsor[commodity].fillna('N/A')
+wsor = wsor[~wsor[commodity].str.contains("Total")]
+wsor[commodity == 'N/A'] = np.nan
+wsor[destination] = wsor[destination].replace(',   ', np.nan)
 wsor['rr'] = 'wsor'
 
 
@@ -277,40 +286,33 @@ wsor['rr'] = 'wsor'
 
 
 def get_rr1_rr2(listofrr):
+    # list of rr has the string of RRS separated by , (ranges from one railroad to 5)
+    # the remaining would only have spaces
     rrs = listofrr.split(",")
-    for i in range(4):
-        try:
-            rrs.remove("    ")
-        except:
-            pass
+    rrs = [x for x in rrs if not re.match(r'[    ]', x)]
     try:
         index_of_rr = rrs.index('YSVR')
     except:
-        print("YSVR not in the list")
-        index_of_rr = len(rrs) - 1
+        print("YSVR not in the list")  # checked that origin is Dore, ND, rr2 always equals BNSF
+        index_of_rr = -99
     if index_of_rr == 0:
         rr2 = rrs[1]
         rr1 = np.nan
     elif index_of_rr == len(rrs) - 1:
         rr1 = rrs[0]
         rr2 = np.nan
+    elif index_of_rr == -99:
+        rr1 = np.nan
+        rr2 = rrs[0]
     else:
         rr1 = rrs[0]
         rr2 = rrs[index_of_rr + 1]
-    try:
-        rr1 = rr1.replace(" ", "")
-    except:
-        pass
-    try:
-        rr2 = rr2.replace(" ", "")
-    except:
-        pass
     return [rr1, rr2]
 
 
 # preparing YSVR
 # total weight given, weight per car not given
-ysvr = YSVR[['COMMODITY DESC', 'ORIGIN', 'DEST', 'ROUTE ROAD 01', 'ROUTE ROAD 02', 'ROUTE ROAD 03', 'ROUTE ROAD 04',
+ysvr = YSVR[['STCC', 'ORIGIN', 'DEST', 'ROUTE ROAD 01', 'ROUTE ROAD 02', 'ROUTE ROAD 03', 'ROUTE ROAD 04',
              "ROUTE ROAD 05", "NET WEIGHT", "MILES"]]
 ysvr['rrlist'] = [
     row['ROUTE ROAD 01'] + "," + row['ROUTE ROAD 02'] + "," + row['ROUTE ROAD 03'] + "," + row['ROUTE ROAD 04'] + "," +
@@ -322,7 +324,7 @@ for i in range(len(ysvr)):
 
 ysvr = ysvr.drop(["rrlist", 'ROUTE ROAD 01', 'ROUTE ROAD 02', 'ROUTE ROAD 03', 'ROUTE ROAD 04', "ROUTE ROAD 05"],
                  axis=1)
-ysvr = ysvr.rename(columns={'Sum of Total Cars': no_of_cars, 'NET WEIGHT': total_wt, 'COMMODITY DESC': commodity,
+ysvr = ysvr.rename(columns={'Sum of Total Cars': no_of_cars, 'NET WEIGHT': total_wt, 'STCC': commodity,
                             'MILES': all_dist, 'rr1': start_rr, 'rr': current_rr,
                             'Destination	D-Rd': forwarded_rr, 'o1': transfer_1, 'd1': transfer_2, 'ORIGIN': origin,
                             'DEST': destination})
@@ -330,16 +332,122 @@ ysvr = ysvr.rename(columns={'Sum of Total Cars': no_of_cars, 'NET WEIGHT': total
 # ysvr.to_csv("ysvr.csv")
 
 
+
+
 # adding all to one
 all = wsor.append(acwr).append(agr).append(fmrc).append(gnbc).append(inrr).append(kyle).append(wsor).append(ysvr)
 
 # all maths
-# all = all[all[commodity].notnull()]
-# all = all[all[no_of_cars].notnull()]
-# all = all[all[wt_per_car].notnull()]
-# all = all[all[online_dist].notnull()]
-# all = all[all[origin].notnull()]
-# all = all[all[destination].notnull()]
+all = all[all[commodity].notnull()]
+#all = all[all[no_of_cars].notnull()]
+#all = all[all[wt_per_car].notnull()]
+#all = all[all[online_dist].notnull()]
+all = all[all[origin].notnull()]
+all = all[all[destination].notnull()]
+all = all.reset_index()
 
 
-all.to_csv('sss.csv')
+all.loc[np.isnan(all[total_wt]), total_wt] = all[no_of_cars]*all[wt_per_car] #important np.nan !=np.nan
+all.drop([no_of_cars,wt_per_car],axis=1, inplace=True)
+all = all[all.wt >0]
+all = all.reset_index()
+
+conv_df = pd.read_csv("conversion.csv")
+
+
+
+live_dict = {}
+for i in range(len(conv_df)):
+    live_dict[conv_df['Unnamed: 0'][i]] = [conv_df['0'][i], conv_df['1'][i], conv_df['2'][i]]
+
+for i in range(len(all)):
+    try:
+        already_int = int(all.at[i, commodity])
+        continue
+    except:
+        #not an integer
+        not_int = all.at[i, commodity]
+        print "{0} is not an integer, working...".format(not_int)
+        try:
+            all.at[i, commodity] = live_dict[not_int.strip().upper()][2]
+            #print "found: {0}".format(all.at[i, commodity])
+        except:
+            #print "Oopsie not found\n\n\n\n\n"
+            #print not_int
+            pass
+
+
+
+
+# martland commodity list
+mart_conv_dict = {
+    #from table
+    20: 1,  # food and kindred products
+    371: 1,  # motor vehicles and equipments
+    113: 2,  # farm products except grain
+    26: 2,  # pulp&paper products
+    32: 2,  # stone, clay & glass
+    24: 3,  # lumbar or wood products
+    1: 3,  # metal & products (confirm this code)
+    8: 4,  # chemicals
+    28: 4,  # petroleum products
+    299: 5, # coke
+    142: 5,  # crushed stone
+    40: 5,  # sand and gravel
+    144: 5,  # grain
+    29: 5,  # waste and scrap
+    11: 6,  # coal
+    10: 6,  # metallic ores
+    #put non metallic minerals here
+    42: 7,  # Containers, Devices, Carriers, Returned Empty
+    421: 7,  # containers
+
+    #from previous
+    37422: 1,  # FREIGHT TRAIN CAR
+    35: 1,  # Machinery (except electrical)
+    36: 1,  # Electrical Machinery Equipment or Supplies
+
+    30:1, # plastic products
+    39:1, # Miscellaneous products of manufacturing
+    41:1,   # Miscellaneous Freight
+
+    44:1, # Freight Forwarder Traffic
+    46:1, # FAK
+    37:1, # Transportation Equipments
+    #204: 1,  # grain mill products
+    22:2, # textile
+    34: 3,  # fabricated metal products
+    33: 3,  # primary metal products
+    49:2, # hazardous chemicals
+    48:5, # hazardous waste
+
+}
+
+
+
+def get_commo(name):
+    str_name = str(name)
+    for i in range(len(str_name)+1):
+        try:
+            return mart_conv_dict[int(str_name)]
+        except:
+            str_name = str_name[:-1]
+    return 0
+
+
+commo_new = 'cmdtymrt'
+all[commo_new] = ''
+
+for i in range(len(all)):
+        try:
+            all.at[i, commo_new] = get_commo(all[commodity][i])
+        except:
+            print "Not found"
+            print all.at[i, commodity]
+
+
+# save it to a csv file
+#drop stupid columns
+all.drop(["level_0",'index'],axis=1, inplace=True)
+
+all.to_csv('shortline_output.csv')
