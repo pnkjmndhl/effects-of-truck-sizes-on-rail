@@ -2,6 +2,32 @@ import pandas as pd
 import numpy as np
 from geopy.geocoders import Nominatim
 from geopy import distance
+import math
+import googlemaps
+
+od_dist_time_dict = {}
+
+
+# Requires API key
+gmaps = googlemaps.Client(key='AIzaSyChD37gN3pUDQoLXB_sW3NcX6MOedEmoQ0')
+# Requires cities name
+o = (35.944574,-83.9898166)
+d = (35.94,-83.98)
+
+def get_dist_time(o,d):
+    print (o,d)
+    if (o,d) in od_dist_time_dict.keys():
+        return od_dist_time_dict[(o,d)]
+    result = gmaps.distance_matrix(o, d)
+    print result
+    time = result['rows'][0]['elements'][0]['duration']['text']
+    dist = float((result['rows'][0]['elements'][0]['distance']['text'].split(" ")[0]).replace(",",""))/1.6
+    od_dist_time_dict[(o, d)] = time,dist
+    return (time,dist)
+
+
+
+
 
 
 data = pd.read_csv("shortline_output.csv")
@@ -13,7 +39,7 @@ distance_bins = {50:1, 200:2, 400:3, 600:4, 800:5, 1200:6}
 use_rate_bins = {8000:1, 32000:2, 100000:3, 200000:4, 400000:5}
 #use_rate_bins = {1000:1, 5000:2}
 
-
+unique_distances = {1:1}
 
 #functions
 def get_dist_bin(val):
@@ -38,57 +64,87 @@ def get_mb(val):
     else:
         return 'b'
 
-def get_coord_auto_man(aa):
-    try:
-        o = geolocator.geocode(aa)
-        return (o.latitude,o.longitude)
-    except:
-        print '"{0}": Not found'.format(aa)
-        return [0,1]
+
+def get_od(dist):
+    if dist in unique_distances.keys():
+        return unique_distances[dist]
+    else:
+        maxi_mum = max(unique_distances.values())
+        unique_distances[dist] = maxi_mum +1
+        return maxi_mum + 1
+
+
+# def get_coord_auto_man(aa):
+#     try:
+#         o = geolocator.geocode(aa)
+#         return (o.latitude,o.longitude)
+#     except:
+#         print '"{0}": Not found'.format(aa)
+#         return [0,1]
 
 
 def get_e_distance(a,b):
-    print "{0}->{1}".format(a,b)
+    #print "{0}->{1}".format(a,b)
     if a in place_coordi_dict.keys():
         origin = place_coordi_dict[a]
-    elif a in place_not_found_dict.keys():
-        return 0
     else:
-        origin = get_coord_auto_man(a)
-        if origin == [0,1]:
-            place_not_found_dict[a] = []
-            return 0
-        place_coordi_dict[a] = origin
+        return 0
     if b in place_coordi_dict.keys():
         destination = place_coordi_dict[b]
-    elif b in place_not_found_dict.keys():
-        return 0
     else:
-        destination = get_coord_auto_man(b)
-        if destination == [0,1]:
-            place_not_found_dict[b] = []
-            return 0
-        place_coordi_dict[b] = destination
-    dist = distance.distance(origin, destination).miles
+        return 0
+    dist = get_dist_time(origin,destination)[1]
     return dist
 
 #calculating distance (temporary)
-data['dist1'] = data['dist1'].fillna(data['dist']*10)
-data['dist_bin'] = data['dist1'].map(get_dist_bin)
+#data['dist1'] = data['dist1'].fillna(data['dist']*10)
 
-place_coordi_dict = {}
-place_not_found_dict = {}
+
+
 
 #removing entries from dictionary
-place_coordi_dict = {x:y for x,y in place_coordi_dict.iteritems() if y != [0,1]}
+#place_coordi_dict = {x:y for x,y in place_coordi_dict.iteritems() if y != [0,1]}
+
+#save
+#pd.DataFrame.from_dict(od_dist_time_dict).transpose().to_csv("od_dist_time.csv")
+
+#retrieve
+dumm = pd.DataFrame.from_csv("od_dist_time.csv").reset_index()
+dumm['new'] = "(" + dumm['index'] +"," + dumm['Unnamed: 1'] + ")"
+dumm.drop(['index', 'Unnamed: 1'], axis = 1, inplace = True)
+dumm  = dumm.set_index("new")
+dumm1 = dumm.transpose().to_dict()
+dumm2 = {eval(x):[y['0'], y['1']] for x,y in dumm1.iteritems()}
+dumm2 = {x:(float(y['latlon'].split(',')[0]), float(y['latlon'].split(',')[1]))  for x,y in name_to_coord1.iteritems()}
+od_dist_time_dict = dumm2
 
 
 
+name_to_coord = pd.DataFrame.from_csv("name_to_coord.csv")
+name_to_coord1 = name_to_coord.dropna().transpose().to_dict()
+name_to_coord2 = {x:(float(y['latlon'].split(',')[0]), float(y['latlon'].split(',')[1]))  for x,y in name_to_coord1.iteritems()}
+place_coordi_dict = name_to_coord2
+
+#search on google maps
 
 geolocator = Nominatim(user_agent = "rail_project_pdahal1")
 data['d'] = data.apply(lambda x: get_e_distance(a = x['origin'], b = x['destination']), axis=1)
+data['dist_bin'] = data['d'].map(get_dist_bin)
+#just use this distance
 
-data['origin1'] = data['origin'].map(get_origin)
+
+data['type'] = data['cmdtymrt'].map(get_mb)
+
+
+data.drop(['Unnamed: 0', 'False', 'cmdty', 'd1', 'dist', 'dist1', 'o1', 'rr', 'rr1', 'rr2' , 'origin', 'destination'], axis=1, inplace=True)
+
+
+#for each unique value of od, give a distance called od
+data['od'] = data['d'].map(get_od)
+
+
+
+
 
 #calculating use rate
 use_rate_df = pd.pivot_table(data, values='wt', index=['type', 'od' ], aggfunc=np.sum).reset_index()
@@ -96,6 +152,7 @@ use_rate_df = use_rate_df.rename(columns = {'wt':'use_rate'})
 use_rate_df['use_rate_bin'] = use_rate_df['use_rate'].map(use_rate_bin)
 
 #data.wt = data.wtpcr * data.nos
+
 
 #merging the use rate to the original data
 data = data.merge(use_rate_df, on=['type', 'od'], how='left')
@@ -116,10 +173,12 @@ data = data.dropna()
 #data['type'] = data['cmdtymrt'].map(get_mb)
 
 
+
+
 #SHIPMENT BASED MODEL
 #table 1
 count_df = data.groupby(['type', 'use_rate_bin', 'dist_bin']).count().reset_index() #use any column
-count_df.drop(['wt', 'od', 'dist'] ,axis=1, inplace=True)
+count_df.drop(['wt', 'od', 'd'] ,axis=1, inplace=True)
 count_df = count_df.rename(columns = {'use_rate':'count'})
 
 sum = count_df['count'].sum()
@@ -134,10 +193,13 @@ avg_df = pd.pivot_table(data, values='wt', index=['dist_bin', 'type', 'use_rate_
 
 
 #predicted_df
-no_of_shpmnt = 36
+no_of_shpmnt = 100000
 
 predicted_1_df = avg_df.merge(count_df, on=['type', 'use_rate_bin', 'dist_bin'], how='left')
 predicted_1_df['tons'] = predicted_1_df['wt'] * predicted_1_df['percent'] * no_of_shpmnt
+
+
+predicted_1_df.to_csv("pred1.csv")
 
 
 #table3
@@ -153,7 +215,8 @@ sum_df['percent'] = ''
 sum_df['percent'] = sum_df['sum_wt']/sum
 
 #predicted_df2
-tonnage = 42000
-
+tonnage = 38260347803 #tons
 predicted_2_df = sum_df.merge(avg_df, on=['type', 'use_rate_bin', 'dist_bin'], how='left')
-predicted_2_df['shipments'] = predicted_2_df['percent'] * tonnage / predicted_2_df['wt']
+predicted_2_df['shipments'] = (predicted_2_df['percent'] * tonnage / predicted_2_df['wt']).round(0)
+
+predicted_2_df.to_csv("pred2.csv")
