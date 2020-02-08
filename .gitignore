@@ -1,1 +1,7 @@
-!*.py
+*.csv
+*.xlsx
+*.xls
+*.xlsm
+*.pdf
+*.txt
+*.docx

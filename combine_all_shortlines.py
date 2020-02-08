@@ -21,14 +21,16 @@ destination = 'destination'
 transfer_1 = "o1"
 transfer_2 = "d1"
 total_wt = 'wt'
+inout = 'inout'
 
 # extract from excel files
 ACWR = pd.ExcelFile("./CARRIER_DATA2/ACWR.xlsx").parse("Sheet1")
 AGR_BPRR = pd.ExcelFile("./CARRIER_DATA2/AGR_BPRR.xlsx").parse("Sheet1")
-FMRC = pd.ExcelFile("./CARRIER_DATA2/FMRC.xlsx").parse("Sheet1")
+#FMRC = pd.ExcelFile("./CARRIER_DATA2/FMRC.xlsx").parse("Sheet1")
 GNBC = pd.ExcelFile("./CARRIER_DATA2/GNBC.xlsx").parse("Sheet1")
 INRR = pd.ExcelFile("./CARRIER_DATA2/INRR.xlsx").parse("Sheet1")
-KYLE = pd.ExcelFile("./CARRIER_DATA2/KYLE.xlsx").parse("Sheet1")
+KYLE = pd.ExcelFile("./CARRIER_DATA2/KYLE_RAW2.xlsx").parse("Sheet1")
+SJVR = pd.ExcelFile("./CARRIER_DATA2/SJVR.xlsx").parse("Sheet1")
 WSOR = pd.ExcelFile("./CARRIER_DATA2/WSOR.xlsx").parse("Sheet1")
 YSVR = pd.ExcelFile("./CARRIER_DATA2/YSVR.xlsx").parse("Sheet1")
 
@@ -63,12 +65,12 @@ for i in range(len(acwr)):
 
 acwr['dest'] = acwr['dest'].replace('Outbound Destinations Unknown', np.nan)
 
-acwr = acwr.drop(['In Out', 'Chrg Patron Id', 'Chrg Rule 260 Cd', 'Interline Off-Line O/D', 'Onl Patron Station Name'],
+acwr = acwr.drop(['Chrg Patron Id', 'Chrg Rule 260 Cd', 'Interline Off-Line O/D', 'Onl Patron Station Name'],
                  axis=1)
 acwr['rr'] = 'acwr'
-acwr = acwr.rename(columns={'Sum of Num Of Cars': no_of_cars, 'Median Weight': wt_per_car, 'Commodity': commodity,
+acwr = acwr.rename(columns={'Sum of Num Of Cars': no_of_cars, 'Median Weight': total_wt, 'Commodity': commodity,
                             'Median Mileage from Station to Interchange': online_dist, 'rr1': start_rr,
-                            'rr': current_rr, 'rr2': forwarded_rr,
+                            'rr': current_rr, 'rr2': forwarded_rr, 'In Out': inout,
                             'o1': transfer_1, 'd1': transfer_2, 'origin': origin, 'dest': destination})
 
 # done
@@ -77,7 +79,7 @@ acwr = acwr.rename(columns={'Sum of Num Of Cars': no_of_cars, 'Median Weight': w
 # preparing AGR_BPRR data
 agr = AGR_BPRR
 agr = agr[['2017Total Cars', 'Average Net Weight', 'STCC Description', 'Interchange Road From', 'City Trip Start',
-           'State Trip Start', 'City Trip End', 'State Trip End',
+           'State Trip Start', 'City Trip End', 'State Trip End', 'Traffic Type',
            'Interchange Road To', 'Average TMS Miles', 'WB Origin', 'WB Destination', 'Railroad Id']]
 agr = agr.replace(',   ', np.nan)
 agr = agr.replace('Missing', np.nan)
@@ -101,47 +103,50 @@ agr = agr.drop(
     axis=1)  # seasonality could be added later
 
 agr = agr.rename(
-    columns={'2017Total Cars': no_of_cars, 'Average Net Weight': wt_per_car, 'STCC Description': commodity,
+    columns={'2017Total Cars': no_of_cars, 'Average Net Weight': total_wt, 'STCC Description': commodity,
              'Average TMS Miles': online_dist, 'Interchange Road From': start_rr, 'Railroad Id': current_rr,
-             'Interchange Road To': forwarded_rr,
+             'Interchange Road To': forwarded_rr, 'Traffic Type': inout,
              'start': transfer_1, 'end': transfer_2, 'WB Origin': origin, 'WB Destination': destination})
+
+agr[total_wt] = agr[total_wt]/2000
 
 # agr.to_csv("agr.csv")
 
 # done
 
 # preparing FMRC data
-fmrc = FMRC
-fmrc['On-Line O/D'] = fmrc['On-Line O/D'] + ", OK"
-fmrc['Interchange Location'] = fmrc['Interchange Location'] + ", OK"
-
-for i in range(len(fmrc)):
-    if fmrc['Inbound or Outbound or Bridge'].iloc[i] == 'Inbound':
-        fmrc.at[i, 'rr1'] = fmrc['Interchange Railroad'].iloc[i]
-        fmrc.at[i, 'o1'] = fmrc['Interchange Location'].iloc[i]
-        fmrc.at[i, 'origin'] = fmrc['Off-Line O/D'].iloc[i]
-        fmrc.at[i, 'destination'] = fmrc['On-Line O/D'].iloc[i]
-    elif fmrc['Inbound or Outbound or Bridge'].iloc[i] == 'Outbound':
-        fmrc.at[i, 'rr2'] = fmrc['Interchange Railroad'].iloc[i]
-        fmrc.at[i, 'd1'] = fmrc['Interchange Location'].iloc[i]
-        fmrc.at[i, 'origin'] = fmrc['On-Line O/D'].iloc[i]
-        fmrc.at[i, 'destination'] = fmrc['Off-Line O/D'].iloc[i]
-    else:
-        fmrc.at[i, 'rr2'] = np.nan
-        fmrc.at[i, 'd1'] = np.nan
-        fmrc.at[i, 'origin'] = np.nan
-        fmrc.at[i, 'destination'] = np.nan
-        fmrc.at[i, 'rr1'] = np.nan
-        fmrc.at[i, 'o1'] = np.nan
-
-fmrc = fmrc.drop(
-    ['Inbound or Outbound or Bridge', 'Off-Line O/D', 'On-Line O/D', 'Interchange Location', 'Interchange Railroad',
-     "Local O/D", "Seasonality"], axis=1)  # seasonality could be added later
-fmrc['rr'] = 'fmrc'
-fmrc = fmrc.rename(
-    columns={'2017 Carloads': no_of_cars, 'Typical Net (Lading) Weight per Car': wt_per_car, 'Commodity': commodity,
-             'Online Shipment Distance': online_dist, 'rr1': start_rr, 'rr': current_rr, 'rr2': forwarded_rr,
-             'o1': transfer_1, 'd1': transfer_2, 'origin': origin, 'dest': destination})
+# FMRC incorporated through GNBC
+# fmrc = FMRC
+# fmrc['On-Line O/D'] = fmrc['On-Line O/D'] + ", OK"
+# fmrc['Interchange Location'] = fmrc['Interchange Location'] + ", OK"
+#
+# for i in range(len(fmrc)):
+#     if fmrc['Inbound or Outbound or Bridge'].iloc[i] == 'Inbound':
+#         fmrc.at[i, 'rr1'] = fmrc['Interchange Railroad'].iloc[i]
+#         fmrc.at[i, 'o1'] = fmrc['Interchange Location'].iloc[i]
+#         fmrc.at[i, 'origin'] = fmrc['Off-Line O/D'].iloc[i]
+#         fmrc.at[i, 'destination'] = fmrc['On-Line O/D'].iloc[i]
+#     elif fmrc['Inbound or Outbound or Bridge'].iloc[i] == 'Outbound':
+#         fmrc.at[i, 'rr2'] = fmrc['Interchange Railroad'].iloc[i]
+#         fmrc.at[i, 'd1'] = fmrc['Interchange Location'].iloc[i]
+#         fmrc.at[i, 'origin'] = fmrc['On-Line O/D'].iloc[i]
+#         fmrc.at[i, 'destination'] = fmrc['Off-Line O/D'].iloc[i]
+#     else:
+#         fmrc.at[i, 'rr2'] = np.nan
+#         fmrc.at[i, 'd1'] = np.nan
+#         fmrc.at[i, 'origin'] = np.nan
+#         fmrc.at[i, 'destination'] = np.nan
+#         fmrc.at[i, 'rr1'] = np.nan
+#         fmrc.at[i, 'o1'] = np.nan
+#
+# fmrc = fmrc.drop(
+#     ['Inbound or Outbound or Bridge', 'Off-Line O/D', 'On-Line O/D', 'Interchange Location', 'Interchange Railroad',
+#      "Local O/D", "Seasonality"], axis=1)  # seasonality could be added later
+# fmrc['rr'] = 'fmrc'
+# fmrc = fmrc.rename(
+#     columns={'2017 Carloads': no_of_cars, 'Typical Net (Lading) Weight per Car': wt_per_car, 'Commodity': commodity,
+#              'Online Shipment Distance': online_dist, 'rr1': start_rr, 'rr': current_rr, 'rr2': forwarded_rr,
+#              'o1': transfer_1, 'd1': transfer_2, 'origin': origin, 'dest': destination})
 
 # fmrc.to_csv("fmrc.csv")
 # done
@@ -171,16 +176,17 @@ for i in range(len(gnbc)):
         gnbc.at[i, 'rr1'] = np.nan
         gnbc.at[i, 'o1'] = np.nan
 
-gnbc = gnbc.drop(['online_od', 'offline_od', 'Inbound or Outbound or Bridge', 'On-Line O/D County', 'On-Line O/D State',
+gnbc = gnbc.drop(['online_od', 'offline_od', 'On-Line O/D County', 'On-Line O/D State',
                   'Off-Line O/D County', 'Off-Line O/D State', 'Interchange Location', 'Interchange Railroad',
                   "Local O/D", "Seasonality", 'On-Line O/D', 'Off-Line O/D', 'Unnamed: 15'],
                  axis=1)  # seasonality could be added later
 gnbc['rr'] = 'gnbc'
 gnbc = gnbc.rename(
     columns={'2017 Carloads': no_of_cars, 'Typical Net (Lading) Weight per Car': wt_per_car, 'Commodity': commodity,
-             'Online Shipment Distance': online_dist, 'rr1': start_rr, 'rr': current_rr, 'rr2': forwarded_rr,
+             'Online Shipment Distance': online_dist, 'rr1': start_rr, 'rr': current_rr, 'rr2': forwarded_rr, 'Inbound or Outbound or Bridge':inout,
              'o1': transfer_1, 'd1': transfer_2, 'origin': origin, 'dest': destination})
 
+gnbc[wt_per_car] = gnbc[wt_per_car]/2000
 # gnbc.to_csv("gnbc.csv")
 # done
 
@@ -217,31 +223,74 @@ for i in range(len(inrr)):
         inrr.at[i, 'd1'] = np.nan
 
 inrr = inrr.drop(
-    ['On-Line O/D', 'Off-Line O/D', 'Interchange Location', 'Interchange Railroad', 'Inbound or Outbound or Bridge'],
+    ['On-Line O/D', 'Off-Line O/D', 'Interchange Location', 'Interchange Railroad'],
     axis=1)
 inrr['rr'] = 'inrr'
 inrr = inrr.rename(
     columns={'2017 Carloads': no_of_cars, 'Typical Net (Lading) Weight per Car': wt_per_car, 'Commodity': commodity,
-             'Online Shipment Distance': online_dist, 'rr1': start_rr, 'rr': current_rr, 'rr2': forwarded_rr,
+             'Online Shipment Distance': online_dist, 'rr1': start_rr, 'rr': current_rr, 'rr2': forwarded_rr, 'Inbound or Outbound or Bridge':inout,
              'o1': transfer_1, 'd1': transfer_2, 'origin': origin, 'dest': destination})
+
+inrr[wt_per_car] = inrr[wt_per_car]/2000
+
 # done
 
 # preparing KYLE
 kyle = KYLE
 kyle = kyle[
-    ['Interchange Road From', 'Interchange Road To', 'STCC', 'Net Weight', 'Station Name Trip Start',
-     'State Trip Start', 'Station Name Trip End', 'State Trip End', 'TMS Miles', 'Number of Cars', 'WB Origin',
-     'WB Destination']]
-kyle['o1'] = kyle['Station Name Trip Start'] + ', ' + kyle['State Trip Start']
-kyle['d1'] = kyle['Station Name Trip End'] + ', ' + kyle['State Trip End']
-kyle = kyle.drop(['Station Name Trip Start', 'State Trip Start', 'Station Name Trip End', 'State Trip End'], axis=1)
-kyle = kyle.rename(columns={'Number of Cars': no_of_cars, 'Net Weight': wt_per_car, 'STCC': commodity,
-                            'TMS Miles': online_dist, 'Interchange Road From': start_rr, 'rr': current_rr,
-                            'Interchange Road To': forwarded_rr, 'WB Origin': origin, 'WB Destination': destination})
+    ['From Station/Road', 'To Station/Road', 'STCC', 'AVERAGE WEIGHT', 'Origin State',
+     'Origin Station', 'Destination Station', 'Destination State', 'ROUTE ONLINE MILES', 'TYPE OF TRAFFIC']]
+kyle['o1'] = kyle['Origin Station'].str.strip() + ', ' + kyle['Origin State']
+kyle['d1'] = kyle['Destination Station'].str.strip() + ', ' + kyle['Destination State']
+
+kyle = kyle.drop(['Origin Station', 'Origin State', 'Destination Station', 'Destination State'], axis=1)
+
+kyle = kyle.rename(columns={'AVERAGE WEIGHT': total_wt, 'STCC': commodity, 'TYPE OF TRAFFIC': inout,
+                            'ROUTE ONLINE MILES': online_dist, 'From Station/Road': start_rr,
+                            'To Station/Road': forwarded_rr, 'o1': origin, 'd1': destination})
 kyle = kyle.replace('Missing', np.nan)
+kyle[total_wt] = kyle[total_wt]/2000
 kyle['rr'] = 'kyle'
 
 # done
+
+
+#SJVR
+# preparing KYLE
+sjvr = SJVR
+sjvr = sjvr[
+    ['TYPE OF TRAFFIC','Commodity Name', 'Average weight', 'Origin Station', 'Origin State', 'Interchange Road',
+     'Interchange Station', 'Dest Station', 'Dest State', 'Car Count', 'ROUTE ONLINE MILES',
+     'TOTAL ONLINE MILES']]
+sjvr['oo'] = sjvr['Origin Station'].str.rstrip() + ', ' + sjvr['Origin State']
+sjvr['dd'] = sjvr['Dest Station'].str.rstrip() + ', ' + sjvr['Dest State']
+
+sjvr['rr1'] = ''
+sjvr['rr2'] = ''
+sjvr['o1'] = ''
+sjvr['o2'] = ''
+
+for i in range(len(sjvr)):
+    if sjvr['TYPE OF TRAFFIC'].iloc[i] == 'ORIGINATING':
+        sjvr.at[i, 'rr2'] = sjvr['Interchange Road'].iloc[i]
+        sjvr.at[i, 'd1'] = sjvr['Interchange Station'].iloc[i]
+    elif sjvr['TYPE OF TRAFFIC'].iloc[i] == 'TERMINATING':
+        sjvr.at[i, 'rr1'] = sjvr['Interchange Road'].iloc[i]
+        sjvr.at[i, 'o1'] = sjvr['Interchange Station'].iloc[i]
+    else:
+        sjvr.at[i, 'rr1'] = np.nan
+        sjvr.at[i, 'rr2'] = np.nan
+        sjvr.at[i, 'o1'] = np.nan
+        sjvr.at[i, 'd1'] = np.nan
+
+sjvr = sjvr.drop(['Origin Station', 'Origin State', 'Dest Station', 'Dest State', 'Interchange Road', 'Interchange Station'], axis=1)
+
+sjvr = sjvr.rename(columns={'Car Count': no_of_cars, 'Average weight': total_wt, 'Commodity Name': commodity,
+                            'ROUTE ONLINE MILES': online_dist, 'Interchange Road From': start_rr, 'rr': current_rr, 'TYPE OF TRAFFIC':inout,
+                            'Interchange Road To': forwarded_rr, 'oo': origin, 'dd': destination, 'TOTAL ONLINE MILES': all_dist})
+sjvr['rr'] = 'sjvr'
+sjvr[total_wt] = sjvr[total_wt]/2000
+
 
 
 # preparing WSOR
@@ -266,9 +315,9 @@ for i in range(len(wsor)):
             wsor.at[i, 'rr2'] = np.nan
         wsor.at[i, 'd1'] = np.nan
 
-wsor = wsor.drop(['D-Rd', 'IB/OB', 'O-Rd', 'Road & Junctions'], axis=1)
-wsor = wsor.rename(columns={'Sum of Total Cars': no_of_cars, 'Average of Tons': wt_per_car, 'Commodity': commodity,
-                            'Average of Miles2': all_dist, 'rr1': start_rr, 'rr': current_rr,
+wsor = wsor.drop(['D-Rd', 'O-Rd', 'Road & Junctions'], axis=1)
+wsor = wsor.rename(columns={'Sum of Total Cars': no_of_cars, 'Average of Tons': total_wt, 'Commodity': commodity,
+                            'Average of Miles2': all_dist, 'rr1': start_rr, 'rr': current_rr, 'IB/OB':inout,
                             'Destination	D-Rd': forwarded_rr, 'o1': transfer_1, 'd1': transfer_2, 'Origin': origin,
                             'Destination': destination})
 
@@ -313,7 +362,7 @@ def get_rr1_rr2(listofrr):
 # preparing YSVR
 # total weight given, weight per car not given
 ysvr = YSVR[['STCC', 'ORIGIN', 'DEST', 'ROUTE ROAD 01', 'ROUTE ROAD 02', 'ROUTE ROAD 03', 'ROUTE ROAD 04',
-             "ROUTE ROAD 05", "NET WEIGHT", "MILES"]]
+             "ROUTE ROAD 05", "NET WEIGHT", "MILES", ]]
 ysvr['rrlist'] = [
     row['ROUTE ROAD 01'] + "," + row['ROUTE ROAD 02'] + "," + row['ROUTE ROAD 03'] + "," + row['ROUTE ROAD 04'] + "," +
     row['ROUTE ROAD 05'] for index, row in ysvr.iterrows()]
@@ -324,10 +373,25 @@ for i in range(len(ysvr)):
 
 ysvr = ysvr.drop(["rrlist", 'ROUTE ROAD 01', 'ROUTE ROAD 02', 'ROUTE ROAD 03', 'ROUTE ROAD 04', "ROUTE ROAD 05"],
                  axis=1)
-ysvr = ysvr.rename(columns={'Sum of Total Cars': no_of_cars, 'NET WEIGHT': total_wt, 'STCC': commodity,
-                            'MILES': all_dist, 'rr1': start_rr, 'rr': current_rr,
+
+def get_inout(val):
+    if val == 'DORE , ND':
+        return 'Outbound'
+    else:
+        return 'Inbound'
+
+
+ysvr['inout'] = ysvr['ORIGIN'].map(get_inout)
+
+
+ysvr = ysvr.rename(columns={'NET WEIGHT': total_wt, 'STCC': commodity,
+                            'MILES': all_dist, 'rr1': start_rr, 'rr': current_rr, 'inout':inout,
                             'Destination	D-Rd': forwarded_rr, 'o1': transfer_1, 'd1': transfer_2, 'ORIGIN': origin,
                             'DEST': destination})
+
+ysvr[total_wt] = ysvr[total_wt]/2000
+ysvr['rr'] = 'ysvr'
+
 
 # ysvr.to_csv("ysvr.csv")
 
@@ -335,20 +399,47 @@ ysvr = ysvr.rename(columns={'Sum of Total Cars': no_of_cars, 'NET WEIGHT': total
 
 
 # adding all to one
-all = wsor.append(acwr).append(agr).append(fmrc).append(gnbc).append(inrr).append(kyle).append(wsor).append(ysvr)
+#all = wsor.append(acwr).append(agr).append(fmrc).append(gnbc).append(inrr).append(kyle).append(sjvr).append(wsor).append(ysvr)
+all = wsor.append(acwr).append(agr).append(gnbc).append(inrr).append(kyle).append(sjvr).append(wsor).append(ysvr)
 
 # all maths
-all = all[all[commodity].notnull()]
+all = all[all[commodity].notnull()] #commodity cant be null
 #all = all[all[no_of_cars].notnull()]
 #all = all[all[wt_per_car].notnull()]
 #all = all[all[online_dist].notnull()]
 all = all[all[origin].notnull()]
 all = all[all[destination].notnull()]
 all = all.reset_index()
+all = all.drop(['index'], axis = 1)
 
+
+
+#calculating inorout
+inout_dict = {"In": 'Terminating',
+              "Out": "Originating",
+              "Bridge" : 'unknown',
+              'Empty': 'unknown',
+              'Local': 'Originating',
+              "LOCAL": "Originating",
+              'Received': 'Terminating',
+              'Operating': 'unknown',
+              'ORIGINATING': 'Originating',
+              "TERMINATING": "Terminating",
+              "Forwarded": 'Originating',
+              '': 'unknown',
+              'Inbound': 'Terminating',
+              'Outbound': "Originating",
+              'ORIGINATE': 'Originating',
+              'TERMINATE': 'Terminating',
+            'Local': 'Originating',
+              }
+all.inout = all.inout.map(inout_dict)
+
+#all.to_csv("apple.csv")
 
 all.loc[np.isnan(all[total_wt]), total_wt] = all[no_of_cars]*all[wt_per_car] #important np.nan !=np.nan
-all.drop([no_of_cars,wt_per_car],axis=1, inplace=True)
+#all.drop([no_of_cars,wt_per_car],axis=1, inplace=True)
+#all.drop([no_of_cars,wt_per_car],axis=1, inplace=True)
 all = all[all.wt >0]
 all = all.reset_index()
 
@@ -358,7 +449,7 @@ conv_df = pd.read_csv("conversion.csv")
 
 live_dict = {}
 for i in range(len(conv_df)):
-    live_dict[conv_df['Unnamed: 0'][i]] = [conv_df['0'][i], conv_df['1'][i], conv_df['2'][i]]
+    live_dict[conv_df['Unnamed: 0'][i].strip().upper()] = [conv_df['0'][i], conv_df['1'][i], conv_df['2'][i]]
 
 for i in range(len(all)):
     try:
@@ -367,16 +458,8 @@ for i in range(len(all)):
     except:
         #not an integer
         not_int = all.at[i, commodity]
-        print "{0} is not an integer, working...".format(not_int)
-        try:
-            all.at[i, commodity] = live_dict[not_int.strip().upper()][2]
-            #print "found: {0}".format(all.at[i, commodity])
-        except:
-            #print "Oopsie not found\n\n\n\n\n"
-            #print not_int
-            pass
-
-
+        print "'{0}' is not an integer, working...".format(not_int.strip().upper())
+        all.at[i, commodity] = live_dict[not_int.strip().upper()][1]
 
 
 # martland commodity list
@@ -399,8 +482,8 @@ mart_conv_dict = {
     11: 6,  # coal
     10: 6,  # metallic ores
     #put non metallic minerals here
-    42: 7,  # Containers, Devices, Carriers, Returned Empty
-    421: 7,  # containers
+    42: 1,  # Containers, Devices, Carriers, Returned Empty (changed from 7 to 1)
+    421: 1,  # containers
 
     #from previous
     37422: 1,  # FREIGHT TRAIN CAR
@@ -422,6 +505,70 @@ mart_conv_dict = {
     48:5, # hazardous waste
 
 }
+
+
+# martland commodity list
+stcg_conv_dict = {
+
+
+    # from table
+    134:03 ,# agriculture products
+    9: 5,   # Meat, Poultry, Fish, Seafood and their preparations
+
+    8: 20,  # chemicals..
+    142: 5, # crushed stone
+    28: 20, #chemicals or allied products =-> basic chemicals
+    131: 16, #crude petroleum --> crude petroleum
+    10:14, #metallic ores
+    11: 15, #coal
+    1311: 16, #crude petroleum
+    1321:-99,
+    142: 12, #crushed or broken stone except dolomite or slate
+    144: 12, #gravel or sand
+    145: -99,
+    147:
+    20: 1,  # food and kindred products ????
+    371: 1, # motor vehicles and equipments
+    113: 2, # farm products except grain
+    26: 2,  # pulp&paper products
+    32: 2,  # stone, clay & glass
+    24: 3,  # lumbar or wood products
+
+    28: 4,  # petroleum products
+    299: 5, # coke
+
+    40: 5,  # sand and gravel
+    144: 5, # grain
+    29: 5,  # waste and scrap
+    10: 6,  # metallic ores
+    #put non metallic minerals here
+    42: 1,  # Containers, Devices, Carriers, Returned Empty (changed from 7 to 1)
+    421: 1, # containers
+
+
+    # from previous
+    37422: 1,  # FREIGHT TRAIN CAR
+    35: 1,  # Machinery (except electrical)
+    36: 1,  # Electrical Machinery Equipment or Supplies
+
+
+    30:1,  # plastic products
+    39:1,  # Miscellaneous products of manufacturing
+    41:1,  # Miscellaneous Freight
+
+
+    44:1,  # Freight Forwarder Traffic
+    46:1,  # FAK
+    37:1,  # Transportation Equipments
+    # 204: 1,  # grain mill products
+    22:2,  # textile
+    34: 3, # fabricated metal products
+    33: 3, # primary metal products
+    49:2,  # hazardous chemicals
+    48:5,  # hazardous waste
+
+}
+
 
 
 
@@ -448,6 +595,6 @@ for i in range(len(all)):
 
 # save it to a csv file
 #drop stupid columns
-all.drop(["level_0",'index'],axis=1, inplace=True)
+all.drop(['index'],axis=1, inplace=True)
 
 all.to_csv('shortline_output.csv')

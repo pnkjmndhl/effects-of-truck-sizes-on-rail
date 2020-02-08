@@ -104,6 +104,5 @@ sum_df['percent'] = sum_df['sum_wt']/sum
 
 #predicted_df2
 tonnage = 42000
-
 predicted_2_df = sum_df.merge(avg_df, on=['type', 'use_rate_bin', 'dist_bin'], how='left')
 predicted_2_df['shipments'] = predicted_2_df['percent'] * tonnage / predicted_2_df['wt']
