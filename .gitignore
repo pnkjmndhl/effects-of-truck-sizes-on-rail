@@ -1,7 +1,5 @@
-*.csv
-*.xlsx
-*.xls
-*.xlsm
 *.pdf
-*.txt
 *.docx
+*.txt
+
+avoid/

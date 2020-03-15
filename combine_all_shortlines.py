@@ -64,9 +64,7 @@ for i in range(len(acwr)):
         acwr.at[i, 'd1'] = np.nan
 
 acwr['dest'] = acwr['dest'].replace('Outbound Destinations Unknown', np.nan)
-
-acwr = acwr.drop(['Chrg Patron Id', 'Chrg Rule 260 Cd', 'Interline Off-Line O/D', 'Onl Patron Station Name'],
-                 axis=1)
+acwr = acwr.drop(['Chrg Patron Id', 'Chrg Rule 260 Cd', 'Interline Off-Line O/D', 'Onl Patron Station Name'],axis=1)
 acwr['rr'] = 'acwr'
 acwr = acwr.rename(columns={'Sum of Num Of Cars': no_of_cars, 'Median Weight': total_wt, 'Commodity': commodity,
                             'Median Mileage from Station to Interchange': online_dist, 'rr1': start_rr,
@@ -109,6 +107,7 @@ agr = agr.rename(
              'start': transfer_1, 'end': transfer_2, 'WB Origin': origin, 'WB Destination': destination})
 
 agr[total_wt] = agr[total_wt]/2000
+
 
 # agr.to_csv("agr.csv")
 
@@ -402,9 +401,13 @@ ysvr['rr'] = 'ysvr'
 #all = wsor.append(acwr).append(agr).append(fmrc).append(gnbc).append(inrr).append(kyle).append(sjvr).append(wsor).append(ysvr)
 all = wsor.append(acwr).append(agr).append(gnbc).append(inrr).append(kyle).append(sjvr).append(wsor).append(ysvr)
 
+
+
+
 # all maths
+all = all[all[no_of_cars].notnull()]
 all = all[all[commodity].notnull()] #commodity cant be null
-#all = all[all[no_of_cars].notnull()]
+
 #all = all[all[wt_per_car].notnull()]
 #all = all[all[online_dist].notnull()]
 all = all[all[origin].notnull()]
@@ -444,145 +447,71 @@ all = all[all.wt >0]
 all = all.reset_index()
 
 conv_df = pd.read_csv("conversion.csv")
+STCG_df1 = pd.ExcelFile("SCTG.xlsx").parse("STCC 4-digit").append(pd.ExcelFile("SCTG.xlsx").parse("STCC 5-digit")).reset_index()[['STCC', 'SCTG']]
+STCG_49 = pd.ExcelFile("49.xlsx").parse("Sheet1").reset_index()[['STCC', 'SCTG']]
 
+stcg_dict = STCG_df1.transpose().to_dict()
+stcg_dict = {y['STCC']:y['SCTG'] for x,y in stcg_dict.iteritems()}
+
+stcg_49_dict = STCG_49.transpose().to_dict()
+stcg_49_dict = {y['STCC']:y['SCTG'] for x,y in stcg_49_dict.iteritems()}
 
 
 live_dict = {}
 for i in range(len(conv_df)):
-    live_dict[conv_df['Unnamed: 0'][i].strip().upper()] = [conv_df['0'][i], conv_df['1'][i], conv_df['2'][i]]
+    live_dict[conv_df['Unnamed: 0'][i].strip().upper()] = [conv_df['0'][i], conv_df['1'][i]]
 
+#all is changed to STCC
 for i in range(len(all)):
-    try:
-        already_int = int(all.at[i, commodity])
-        continue
+    commodi_ = all.at[i, commodity]
+    try: # remove '113710 '
+        commodi_ = commodi_.strip()
     except:
-        #not an integer
-        not_int = all.at[i, commodity]
-        print "'{0}' is not an integer, working...".format(not_int.strip().upper())
-        all.at[i, commodity] = live_dict[not_int.strip().upper()][1]
-
-
-# martland commodity list
-mart_conv_dict = {
-    #from table
-    20: 1,  # food and kindred products
-    371: 1,  # motor vehicles and equipments
-    113: 2,  # farm products except grain
-    26: 2,  # pulp&paper products
-    32: 2,  # stone, clay & glass
-    24: 3,  # lumbar or wood products
-    1: 3,  # metal & products (confirm this code)
-    8: 4,  # chemicals
-    28: 4,  # petroleum products
-    299: 5, # coke
-    142: 5,  # crushed stone
-    40: 5,  # sand and gravel
-    144: 5,  # grain
-    29: 5,  # waste and scrap
-    11: 6,  # coal
-    10: 6,  # metallic ores
-    #put non metallic minerals here
-    42: 1,  # Containers, Devices, Carriers, Returned Empty (changed from 7 to 1)
-    421: 1,  # containers
-
-    #from previous
-    37422: 1,  # FREIGHT TRAIN CAR
-    35: 1,  # Machinery (except electrical)
-    36: 1,  # Electrical Machinery Equipment or Supplies
-
-    30:1, # plastic products
-    39:1, # Miscellaneous products of manufacturing
-    41:1,   # Miscellaneous Freight
-
-    44:1, # Freight Forwarder Traffic
-    46:1, # FAK
-    37:1, # Transportation Equipments
-    #204: 1,  # grain mill products
-    22:2, # textile
-    34: 3,  # fabricated metal products
-    33: 3,  # primary metal products
-    49:2, # hazardous chemicals
-    48:5, # hazardous waste
-
-}
-
-
-# martland commodity list
-stcg_conv_dict = {
-
-
-    # from table
-    134:03 ,# agriculture products
-    9: 5,   # Meat, Poultry, Fish, Seafood and their preparations
-
-    8: 20,  # chemicals..
-    142: 5, # crushed stone
-    28: 20, #chemicals or allied products =-> basic chemicals
-    131: 16, #crude petroleum --> crude petroleum
-    10:14, #metallic ores
-    11: 15, #coal
-    1311: 16, #crude petroleum
-    1321:-99,
-    142: 12, #crushed or broken stone except dolomite or slate
-    144: 12, #gravel or sand
-    145: -99,
-    147:
-    20: 1,  # food and kindred products ????
-    371: 1, # motor vehicles and equipments
-    113: 2, # farm products except grain
-    26: 2,  # pulp&paper products
-    32: 2,  # stone, clay & glass
-    24: 3,  # lumbar or wood products
-
-    28: 4,  # petroleum products
-    299: 5, # coke
-
-    40: 5,  # sand and gravel
-    144: 5, # grain
-    29: 5,  # waste and scrap
-    10: 6,  # metallic ores
-    #put non metallic minerals here
-    42: 1,  # Containers, Devices, Carriers, Returned Empty (changed from 7 to 1)
-    421: 1, # containers
-
-
-    # from previous
-    37422: 1,  # FREIGHT TRAIN CAR
-    35: 1,  # Machinery (except electrical)
-    36: 1,  # Electrical Machinery Equipment or Supplies
-
-
-    30:1,  # plastic products
-    39:1,  # Miscellaneous products of manufacturing
-    41:1,  # Miscellaneous Freight
-
-
-    44:1,  # Freight Forwarder Traffic
-    46:1,  # FAK
-    37:1,  # Transportation Equipments
-    # 204: 1,  # grain mill products
-    22:2,  # textile
-    34: 3, # fabricated metal products
-    33: 3, # primary metal products
-    49:2,  # hazardous chemicals
-    48:5,  # hazardous waste
-
-}
+        pass
+    if str(commodi_).isdigit():
+        all.at[i, commodity] = str(commodi_)
+        continue
+    else:
+        print "'{0}' is not an integer, working...".format(commodi_.upper())
+        all.at[i, commodity] = live_dict[commodi_.strip().upper()][1]
 
 
 
-
-def get_commo(name):
-    str_name = str(name)
-    for i in range(len(str_name)+1):
+def get_commo(value):
+    value = str(value)
+    if value[0] == '"':
+        value = value[1:-1]
+    if len(value)==6: #if 6 digits then add 0 in front
+        value = '0' + value
+    value4 = '"' + value[0:4] +'"'
+    value5 = '"' + value[0:5] +'"'
+    try: #search value4, if not found, use value5
+        dumm =  stcg_dict[value4]
+        print dumm
+        if dumm == '""': #if dumm is empty
+            raise ValueError('Bro, did not find')
+        found_dict[value] = dumm
+        return dumm
+    except:
         try:
-            return mart_conv_dict[int(str_name)]
+            print value5
+            dumm = stcg_dict[value5]
+            found_dict[value] = dumm
+            return dumm
         except:
-            str_name = str_name[:-1]
-    return 0
+            value = '"' + value +'"'
+            #if not found in both use the 49 dictionary
+            try:
+                dumm = stcg_49_dict[value]
+                found_dict[value] = dumm
+                return dumm
+            except:
+                not_found_dict[value] = [value4, value5]
 
 
-commo_new = 'cmdtymrt'
+not_found_dict = {}
+found_dict = {}
+commo_new = 'commo_new'
 all[commo_new] = ''
 
 for i in range(len(all)):
@@ -590,11 +519,20 @@ for i in range(len(all)):
             all.at[i, commo_new] = get_commo(all[commodity][i])
         except:
             print "Not found"
-            print all.at[i, commodity]
+            #print all.at[i, commodity]
+            not_found_dict[all.at[i, commodity]] = 0
+
+
+pd.DataFrame.from_dict(not_found_dict, orient='index').to_csv("apple.csv")
+
+
+all = all[all[no_of_cars].astype('int') > 0]
+all = all.reindex(all.index.repeat(all[no_of_cars].astype('int')))
+
 
 
 # save it to a csv file
 #drop stupid columns
 all.drop(['index'],axis=1, inplace=True)
 
-all.to_csv('shortline_output.csv')
+all.to_csv('shortline_output_all.csv')
