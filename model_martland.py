@@ -25,7 +25,9 @@ def get_distance_time(o, d):
     return (time, dist)
 
 
-data = pd.read_csv("shortline_output.csv")
+data = pd.read_csv("input/shortline_output_all.csv")
+data.drop("cmdty", axis = 1, inplace = True)
+data.rename(columns = {"commo_new":"cmdty"}, inplace = True)
 
 #filtering of data
 #data = data[data['inout'] == 'Originating']
@@ -127,12 +129,12 @@ data['od'] = data.apply(lambda x: get_unique_od_ids(x['origin'], b=x['destinatio
 # save
 pd.DataFrame.from_dict(od_dist_time_dict).transpose().to_csv("od_dist_time.csv")
 
-data = data.rename(columns={"cmdtymrt": "commodty"})
+data = data.rename(columns={"cmdty": "commodty"})
 
 
 data.drop(
     ['Unnamed: 0', 'o2', 'False', 'd1', 'dist', 'dist1', 'o1', 'rr', 'rr1', 'rr2', 'origin', 'destination',
-     'a_cord', 'b_cord', 'cmdty', 'wtpcr', 'nos'], axis=1, inplace=True)
+     'a_cord', 'b_cord', 'wtpcr', 'nos'], axis=1, inplace=True)
 
 
 # calculating use rate

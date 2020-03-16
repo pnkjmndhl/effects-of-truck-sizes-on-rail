@@ -527,12 +527,13 @@ pd.DataFrame.from_dict(not_found_dict, orient='index').to_csv("apple.csv")
 
 
 all = all[all[no_of_cars].astype('int') > 0]
-all = all.reindex(all.index.repeat(all[no_of_cars].astype('int')))
+all.drop(['index'],axis=1, inplace=True)
 
-
+all1 = all.copy()
 
 # save it to a csv file
 #drop stupid columns
-all.drop(['index'],axis=1, inplace=True)
+all = all.reindex(all.index.repeat(all[no_of_cars].astype('int')))
+all.to_csv('./input/shortline_output_all_expanded.csv')
 
-all.to_csv('shortline_output_all.csv')
+all1.to_csv('./input/shortline_output_all.csv')
