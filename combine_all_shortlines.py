@@ -185,7 +185,7 @@ gnbc = gnbc.rename(
              'Online Shipment Distance': online_dist, 'rr1': start_rr, 'rr': current_rr, 'rr2': forwarded_rr, 'Inbound or Outbound or Bridge':inout,
              'o1': transfer_1, 'd1': transfer_2, 'origin': origin, 'dest': destination})
 
-gnbc[wt_per_car] = gnbc[wt_per_car]/2000
+gnbc[wt_per_car] = gnbc[wt_per_car]
 # gnbc.to_csv("gnbc.csv")
 # done
 
@@ -230,7 +230,7 @@ inrr = inrr.rename(
              'Online Shipment Distance': online_dist, 'rr1': start_rr, 'rr': current_rr, 'rr2': forwarded_rr, 'Inbound or Outbound or Bridge':inout,
              'o1': transfer_1, 'd1': transfer_2, 'origin': origin, 'dest': destination})
 
-inrr[wt_per_car] = inrr[wt_per_car]/2000
+inrr[wt_per_car] = inrr[wt_per_car]
 
 # done
 
@@ -405,7 +405,7 @@ all = wsor.append(acwr).append(agr).append(gnbc).append(inrr).append(kyle).appen
 
 
 # all maths
-all = all[all[no_of_cars].notnull()]
+#
 all = all[all[commodity].notnull()] #commodity cant be null
 
 #all = all[all[wt_per_car].notnull()]
@@ -443,7 +443,7 @@ all.inout = all.inout.map(inout_dict)
 all.loc[np.isnan(all[total_wt]), total_wt] = all[no_of_cars]*all[wt_per_car] #important np.nan !=np.nan
 #all.drop([no_of_cars,wt_per_car],axis=1, inplace=True)
 #all.drop([no_of_cars,wt_per_car],axis=1, inplace=True)
-all = all[all.wt >0]
+all = all[all[total_wt] >0]
 all = all.reset_index()
 
 conv_df = pd.read_csv("conversion.csv")
@@ -526,14 +526,13 @@ for i in range(len(all)):
 pd.DataFrame.from_dict(not_found_dict, orient='index').to_csv("apple.csv")
 
 
-all = all[all[no_of_cars].astype('int') > 0]
-all.drop(['index'],axis=1, inplace=True)
-
 all1 = all.copy()
+all1.to_csv('./input/shortline_output_all.csv')
 
 # save it to a csv file
 #drop stupid columns
+all = all[all[no_of_cars].astype('int') > 0]
+all.drop(['index'],axis=1, inplace=True)
 all = all.reindex(all.index.repeat(all[no_of_cars].astype('int')))
 all.to_csv('./input/shortline_output_all_expanded.csv')
 
-all1.to_csv('./input/shortline_output_all.csv')

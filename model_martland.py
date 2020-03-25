@@ -38,9 +38,10 @@ data.drop(['inout'], axis = 1, inplace = True)
 commodty_bins = [1, 2, 3, 4, 5, 6, 7]
 distance_bins = {50: 1, 200: 2, 400: 3, 600: 4, 800: 5, 1200: 6}
 # distance_bins = {200:1, 600:2}
-use_rate_bins = {2000: 1, 8000: 2, 25000: 3, 50000: 4, 100000: 5}
+use_rate_bins = {100:1, 1000: 2, 2000:3, 8000: 4, 25000: 5, 50000: 6, 100000: 7}
 # use_rate_bins = {1000:1, 5000:2}
 
+#to get the use rate
 unique_distances = {1: 1}
 
 

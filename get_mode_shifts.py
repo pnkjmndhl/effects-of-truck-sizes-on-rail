@@ -12,7 +12,7 @@ base = 0
 compare = 1
 
 
-data_df = pd.read_csv("pred2.csv").loc[:, 'dist_bin':'use_rate_bin']
+data_df = pd.read_csv("pred2.csv").loc[:, 'dist_bin':'sum_wt']
 rail_rate_df = pd.read_csv("input/RATES.csv").loc[:, 'SCTG':'RTM']
 truck_rate_df = pd.ExcelFile("input/Rate Table per ton.xlsx").parse("Sheet1")
 
@@ -23,11 +23,11 @@ model1_df = pd.ExcelFile('./input/Modeparms(compare).xlsx').parse("Shpmt Freight
 model2_df = pd.ExcelFile('./input/Modeparms(compare).xlsx').parse("22-Mkt Share Frt-Trans time").loc[0:3, 'SCTG':'Group']
 
 
-#args = (50, '"21"', 2000)
+#args = (50, '"15"', 100, 100)
 
 #get_share(args)
 def get_share(args):
-    commodty, ann_tonnage, dist_bin = args[1], args[2], args[0]
+    commodty, ann_tonnage, dist_bin, sum_wt = args[1], args[2], args[0], args[3]
     try:
         rl_rate_p_tm = float(rail_rate_df[(rail_rate_df['SCTG'].astype(str) == commodty) & (rail_rate_df['DGROUP'] == dist_bin)]['RTM'])
     except:
@@ -57,8 +57,15 @@ def get_share(args):
             cost_transit_time = zip(cost[1:], [float(dist_bin)/x for x in _truck_speed_ ])
             Ut = [b0 + bC * x + bT *  y for x,y in cost_transit_time]  #distance in miles divided by speed in mph
         except:
-            print ("{0}, {1}, {2}".format(commodty, ann_tonnage, dist_bin))
-            return -99,-99,-99, -99, -99
+            try: #model3
+                O = 0.05
+                W = 2472 #hrs/yr
+                GCt = Rt + Tt*Vi*O/W
+                GCr = Rr + Tr*Vi*O/W
+
+            except:
+                print ("{0}, {1}, {2}".format(commodty, ann_tonnage, dist_bin))
+                return -99,-99,-99, -99, -99
     #print cost
     #print ("{0}.{1}".format(Ur, Ut))
     pt = [1.0/(1+np.exp(Ur-x)) for x in Ut]
