@@ -6,8 +6,8 @@ from scipy.optimize import curve_fit
 
 
 #constants
-truck_speed = [60,60,60,60] #mph
-rail_speed = 40 #mph
+truck_speed = [45,45,45,45] #mph
+rail_speed = 20 #mph
 base = 0
 compare = 1
 
@@ -19,11 +19,11 @@ truck_rate_df = pd.ExcelFile("input/Rate Table per ton.xlsx").parse("Sheet1")
 
 
 #select the columns from start to end
-model1_df = pd.ExcelFile('./input/Modeparms(compare).xlsx').parse("Shpmt Freight Rate Models").loc[0:35, 'SCTG':'Group']
+model1_df = pd.ExcelFile('./input/Modeparms(compare).xlsx').parse("Shpmt Freight Rate Models").loc[0:37, 'SCTG':'Group']
 model2_df = pd.ExcelFile('./input/Modeparms(compare).xlsx').parse("22-Mkt Share Frt-Trans time").loc[0:3, 'SCTG':'Group']
 
 
-#args = (50, '"15"', 100, 100)
+#args = (50, '"19"', 100, 100)
 
 #get_share(args)
 def get_share(args):
@@ -57,24 +57,27 @@ def get_share(args):
             cost_transit_time = zip(cost[1:], [float(dist_bin)/x for x in _truck_speed_ ])
             Ut = [b0 + bC * x + bT *  y for x,y in cost_transit_time]  #distance in miles divided by speed in mph
         except:
-            try: #model3
-                O = 0.05
-                W = 2472 #hrs/yr
-                GCt = Rt + Tt*Vi*O/W
-                GCr = Rr + Tr*Vi*O/W
-
+            try: #there are commodities that would fit this model
+                int("apple") #this would throw error
             except:
                 print ("{0}, {1}, {2}".format(commodty, ann_tonnage, dist_bin))
-                return -99,-99,-99, -99, -99
+                return -99,-99,-99, -99, -99, -99
     #print cost
     #print ("{0}.{1}".format(Ur, Ut))
     pt = [1.0/(1+np.exp(Ur-x)) for x in Ut]
-    return Ur, Ut[0], Ut[1], pt[0], pt[1]
+    return Ur, Ut[0], Ut[1], pt[0], pt[1], rl_rate_p_tm
 
-
+#drop any tonnages less than 75 tons/carload
+data_df =data_df[data_df.sum_wt >= 75]
 
 #data_df1[['Ur','Ut0','Ut1','pt0','pt1']] = []
 #data_df1[['Ur','Ut0','Ut1','pt0','pt1']] = zip(*data_df.apply(get_share, axis = 1))
-data_df['Ur'], data_df['Ut0'], data_df['Ut1'], data_df['pt0'], data_df['pt1'] = zip(*data_df.apply(get_share, axis = 1))
+data_df['Ur'], data_df['Ut0'], data_df['Ut1'], data_df['pt0'], data_df['pt1'], data_df['rl_rate_ptm'] = zip(*data_df.apply(get_share, axis = 1))
+data_df['tr_addi']= data_df['pt1']-data_df['pt0']
+data_df['lost_ton'] = data_df['tr_addi'] *data_df['sum_wt']
+data_df['lost_rev'] = data_df['rl_rate_ptm']*data_df['lost_ton'] *data_df['dist_bin']
+
+
+
 
 data_df.to_csv("mode_split.csv")
