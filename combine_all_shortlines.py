@@ -31,7 +31,7 @@ GNBC = pd.ExcelFile("./CARRIER_DATA2/GNBC.xlsx").parse("Sheet1")
 INRR = pd.ExcelFile("./CARRIER_DATA2/INRR.xlsx").parse("Sheet1")
 KYLE = pd.ExcelFile("./CARRIER_DATA2/KYLE_RAW2.xlsx").parse("Sheet1")
 SJVR = pd.ExcelFile("./CARRIER_DATA2/SJVR.xlsx").parse("Sheet1")
-WSOR = pd.ExcelFile("./CARRIER_DATA2/WSOR.xlsx").parse("Sheet1")
+WSOR = pd.ExcelFile("./CARRIER_DATA2/WSOR_.xlsx").parse("Data")
 YSVR = pd.ExcelFile("./CARRIER_DATA2/YSVR.xlsx").parse("Sheet1")
 
 # preparing acwr data ??? Interline Off-Line O/D
@@ -298,10 +298,10 @@ sjvr[total_wt] = sjvr[total_wt]/2000
 wsor = WSOR
 # the bridge data has 0 tons so removed
 
-
-wsor = wsor[wsor['IB/OB'] != 'BRIDGE']
+wsor = wsor[wsor['IB/OB'] != 'BRIDGE'] #sincethe tons for all the bridge traffic equals 0
 # wsor = wsor.dropna() #removing "Total" calculated in the excel file, lets not be that aggressive
-wsor = wsor.drop(['Seasonality'], axis=1)
+
+
 wsor['Commodity'] = wsor['Commodity'].str.split('-',1).str[0]
 for i in range(len(wsor)):
     if wsor['IB/OB'].iloc[i] == 'In':
@@ -314,11 +314,16 @@ for i in range(len(wsor)):
             wsor.at[i, 'rr2'] = np.nan
         wsor.at[i, 'd1'] = np.nan
 
-wsor = wsor.drop(['D-Rd', 'O-Rd', 'Road & Junctions'], axis=1)
-wsor = wsor.rename(columns={'Sum of Total Cars': no_of_cars, 'Average of Tons': total_wt, 'Commodity': commodity,
-                            'Average of Miles2': all_dist, 'rr1': start_rr, 'rr': current_rr, 'IB/OB':inout,
+
+
+wsor = wsor.rename(columns={'Total Cars': no_of_cars, 'Tons': total_wt, 'Commodity': commodity,
+                            'Miles': all_dist, 'rr1': start_rr, 'rr': current_rr, 'IB/OB':inout,
                             'Destination	D-Rd': forwarded_rr, 'o1': transfer_1, 'd1': transfer_2, 'Origin': origin,
-                            'Destination': destination})
+                            'Destination': destination, 'MilesonRR': online_dist})
+
+drop_columns = ['Ln', 'Description', 'Traffic Type', 'D-Rd', 'O-Rd', 'Road & Junctions', 'Seasonality', 'O/D']
+
+wsor = wsor.drop(drop_columns, axis=1)
 
 # data with total removed
 wsor[commodity] = wsor[commodity].fillna('N/A')
@@ -326,7 +331,6 @@ wsor = wsor[~wsor[commodity].str.contains("Total")]
 wsor[commodity == 'N/A'] = np.nan
 wsor[destination] = wsor[destination].replace(',   ', np.nan)
 wsor['rr'] = 'wsor'
-
 
 # wsor.to_csv("wsor.csv")
 
@@ -487,14 +491,14 @@ def get_commo(value):
     value5 = '"' + value[0:5] +'"'
     try: #search value4, if not found, use value5
         dumm =  stcg_dict[value4]
-        print dumm
+        #print dumm
         if dumm == '""': #if dumm is empty
             raise ValueError('Bro, did not find')
         found_dict[value] = dumm
         return dumm
     except:
         try:
-            print value5
+            #print value5
             dumm = stcg_dict[value5]
             found_dict[value] = dumm
             return dumm

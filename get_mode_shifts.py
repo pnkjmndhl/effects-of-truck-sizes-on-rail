@@ -1,15 +1,13 @@
 import pandas as pd
 import numpy as np
-import math
-import itertools
-from scipy.optimize import curve_fit
+
 
 
 #constants
 truck_speed = [45,45,45,45] #mph
 rail_speed = 20 #mph
 base = 0
-compare = 1
+compare = [1,2,3]
 
 
 data_df = pd.read_csv("pred2.csv").loc[:, 'dist_bin':'sum_wt']
@@ -37,7 +35,7 @@ def get_share(args):
         rl_rate_p_tm1 = rl_rate_p_tm1.interpolate(method='polynomial', axis=0, order = 3).ffill().bfill()
         rl_rate_p_tm = float(rl_rate_p_tm1[rl_rate_p_tm1['DGROUP']==dist_bin]['RTM'])
     truck_rate_pton_const = truck_rate_df[dist_bin].tolist()
-    truck_rate_pton_const = [y for (x,y) in enumerate(truck_rate_pton_const) if x in [base,compare]]
+    truck_rate_pton_const = [y for (x,y) in enumerate(truck_rate_pton_const) if x in [base,_compare_]]
     cost = [rl_rate_p_tm*ann_tonnage*dist_bin, truck_rate_pton_const[0]*ann_tonnage, truck_rate_pton_const[1]*ann_tonnage]
     #calculation
     try: #model1
@@ -53,7 +51,7 @@ def get_share(args):
             bC = float(model2_df[model2_df.SCTG == int(commodty.replace('"',""))]['bC'])
             bT = float(model2_df[model2_df.SCTG == int(commodty.replace('"',""))]['bT'])
             Ur = bC * cost[0] + bT *  float(dist_bin) / rail_speed  #distance in miles divided by speed in mph
-            _truck_speed_ = [y for (x,y) in enumerate(truck_speed) if x in [base,compare]]
+            _truck_speed_ = [y for (x,y) in enumerate(truck_speed) if x in [base,_compare_]]
             cost_transit_time = zip(cost[1:], [float(dist_bin)/x for x in _truck_speed_ ])
             Ut = [b0 + bC * x + bT *  y for x,y in cost_transit_time]  #distance in miles divided by speed in mph
         except:
@@ -67,17 +65,16 @@ def get_share(args):
     pt = [1.0/(1+np.exp(Ur-x)) for x in Ut]
     return Ur, Ut[0], Ut[1], pt[0], pt[1], rl_rate_p_tm
 
-#drop any tonnages less than 75 tons/carload
-data_df =data_df[data_df.sum_wt >= 75]
 
-#data_df1[['Ur','Ut0','Ut1','pt0','pt1']] = []
-#data_df1[['Ur','Ut0','Ut1','pt0','pt1']] = zip(*data_df.apply(get_share, axis = 1))
-data_df['Ur'], data_df['Ut0'], data_df['Ut1'], data_df['pt0'], data_df['pt1'], data_df['rl_rate_ptm'] = zip(*data_df.apply(get_share, axis = 1))
-data_df['tr_addi']= data_df['pt1']-data_df['pt0']
-data_df['lost_ton'] = data_df['tr_addi'] *data_df['sum_wt']
-data_df['lost_rev'] = data_df['rl_rate_ptm']*data_df['lost_ton'] *data_df['dist_bin']
+for _compare_ in compare:
+    #drop any tonnages less than 75 tons/carload
+    data_df = pd.read_csv("pred2.csv").loc[:, 'dist_bin':'sum_wt']
+    data_df =data_df[data_df.sum_wt >= 75]
+    #data_df1[['Ur','Ut0','Ut1','pt0','pt1']] = []
+    #data_df1[['Ur','Ut0','Ut1','pt0','pt1']] = zip(*data_df.apply(get_share, axis = 1))
+    data_df['Ur'], data_df['Ut0'], data_df['Ut1'], data_df['pt0'], data_df['pt1'], data_df['rl_rate_ptm'] = zip(*data_df.apply(get_share, axis = 1))
+    data_df['tr_addi']= data_df['pt1']-data_df['pt0']
+    data_df['lost_ton'] = data_df['tr_addi'] *data_df['sum_wt']
+    data_df['lost_rev'] = data_df['rl_rate_ptm']*data_df['lost_ton'] *data_df['dist_bin']
 
-
-
-
-data_df.to_csv("mode_split.csv")
+    data_df.to_csv("mode_split_{0}_{1}.csv".format(base,_compare_))
